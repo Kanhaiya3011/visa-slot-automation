@@ -1,0 +1,70 @@
+{
+  "action": {
+    "default_icon": {
+      "128": "icons/icon128.png",
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Visa Slot Guard"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.usvisascheduling.com/*",
+        "https://atlasauth.b2clogin.com/*"
+      ],
+      "js": [
+        "src/lib/storage.js",
+        "src/lib/detector.js",
+        "src/lib/availability.js",
+        "src/lib/notify.js",
+        "src/lib/questions.js",
+        "src/lib/scheduler.js",
+        "src/content/login.js",
+        "src/content/portal.js",
+        "src/content/booking.js",
+        "src/lib/burst.js",
+        "src/content/panel.js",
+        "src/content/access-block.js",
+        "src/content/session-reset.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://*.usvisascheduling.com/*"
+      ],
+      "js": [
+        "src/content/page-bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "description": "Monitors usvisascheduling.com for appointment slots. Tells you why it stopped and resumes by itself when it can.",
+  "host_permissions": [
+    "https://*.usvisascheduling.com/*",
+    "https://atlasauth.b2clogin.com/*",
+    "https://api.ipify.org/*"
+  ],
+  "icons": {
+    "128": "icons/icon128.png",
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png"
+  },
+  "manifest_version": 3,
+  "name": "Visa Slot Guard",
+  "permissions": [
+    "alarms",
+    "storage",
+    "notifications",
+    "tabs",
+    "scripting",
+    "cookies"
+  ],
+  "version": "2.0.1"
+}

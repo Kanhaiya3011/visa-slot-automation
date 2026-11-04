@@ -1,0 +1,32 @@
+body { width: 420px; margin: 0; padding: 10px; font: 13px/1.45 system-ui, sans-serif; color: #222; }
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+h1 { font-size: 16px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 6px; }
+.card { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+.badge { padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 12px; background: #eee; }
+.badge.HEALTHY { background: #c8e6c9; } .badge.DEGRADED { background: #ffecb3; }
+.badge.NEEDS_USER { background: #ffcdd2; } .badge.PAUSED { background: #e0e0e0; }
+.badge.BLOCKED { background: #4a0000; color: #fff; }
+label { display: block; margin: 6px 0; }
+input[type="text"], input[type="password"], input[type="date"], input[type="number"], select {
+  width: 100%; box-sizing: border-box; padding: 6px; margin-top: 2px;
+  border: 1px solid #ccc; border-radius: 6px;
+}
+.row { display: flex; gap: 10px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.row.space { justify-content: space-between; }
+.check { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+.muted { color: #777; } .small { font-size: 11.5px; } .hidden { display: none; }
+button { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; background: #f7f7f7; cursor: pointer; }
+button.primary { background: #1565c0; color: #fff; border-color: #1565c0; width: 100%; font-size: 14px; }
+button.secondary { background: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+.log { list-style: none; padding: 0; margin: 6px 0 0; max-height: 150px; overflow-y: auto; font-size: 11.5px; }
+.log li { padding: 4px 6px; border-bottom: 1px solid #f0f0f0; }
+.log .t { color: #999; margin-right: 6px; }
+.log li.warn { background: #fff8e1; } .log li.error { background: #ffebee; } .log li.ok { background: #f1f8e9; }
+footer { display: flex; gap: 10px; align-items: center; }
+.addRow { flex-wrap: nowrap; }
+.addRow select { width: auto; flex: 0 0 150px; }
+.addRow input[type="text"] { width: auto; flex: 1 1 auto; min-width: 0; }
+.addRow button { flex: 0 0 auto; white-space: nowrap; }
+#myIp { display: block; margin-top: 8px; }
