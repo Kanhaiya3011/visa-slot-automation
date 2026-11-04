@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Visa Slot Guard</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <h1>Visa Slot Guard</h1>
+  <div id="stateBadge" class="badge">…</div>
+</header>
+
+<section class="card">
+  <h2>Monitor</h2>
+  <label>Consulate
+      <select id="consulate"><option value=""></option></select>
+  </label>
+  <p id="postsNote" class="muted small"></p>
+  <div id="rotateBox" class="hidden">
+    <div class="small"><strong>Posts to rotate on the OFC page</strong>
+      <span class="muted">(saved as soon as you tick)</span></div>
+    <div id="rotateList"></div>
+  </div>
+  <div class="row">
+    <label>From <input type="date" id="dateFrom"></label>
+    <label>To <input type="date" id="dateTo"></label>
+  </div>
+  <label>Check every (minutes)
+    <input type="number" id="intervalMin" min="5" max="120" step="5">
+  </label>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="soundAlert"> Sound</label>
+    <label class="check"><input type="checkbox" id="desktopAlert"> Desktop alert</label>
+  </div>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="autoReopenTab"> Reopen portal tab if closed</label>
+  </div>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="paused"> Pause monitoring</label>
+  </div>
+  <p id="blockedNote" class="muted small hidden" style="color:#c62828">
+    The portal blocked access as a possible Terms-of-use (Prohibited Conduct) violation — monitoring
+    was stopped automatically and nothing was retried or cleared. Review the Terms and conditions
+    before unticking Pause to resume.
+  </p>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="autoResetSession"> On PSE0501 (session expired): clear cookies and sign in again</label>
+  </div>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="resetKeepCloudflare"> Keep Cloudflare cookies when clearing (avoids a new human check)</label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Community data (experimental)</h2>
+  <p class="muted small">Periodically fetches recent posts from the sources below and, if several
+    independently mention the same hour range, adds an automatic burst window for it. This is
+    unverified third-party text — see the extension's README for the safety bounds this is subject to
+    (vote threshold, window cap, fixed modest speed). Off by default.</p>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="communitySyncEnabled"> Enable community data sync</label>
+  </div>
+  <ul id="communityList" class="log"></ul>
+  <div class="row addRow">
+    <select id="communityType"><option value="reddit">Reddit (subreddit name)</option><option value="telegram">Telegram (public channel username)</option></select>
+    <input type="text" id="communityId" placeholder="e.g. visaslots">
+    <button id="communityAdd" class="secondary">Add</button>
+  </div>
+  <div class="row">
+    <button id="communitySyncNow" class="secondary">Sync now</button>
+    <span class="muted small" id="communityStatus"></span>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Login &amp; booking helpers</h2>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="qlEnabled"> Sign in automatically when the portal loads</label>
+  </div>
+  <div id="qlFields" class="hidden">
+    <label>Username <input type="text" id="qlUser" autocomplete="off"></label>
+    <label>Password <input type="password" id="qlPass" autocomplete="off"></label>
+    <div class="small"><strong>Saved security questions</strong>
+      <span class="muted">(add them from the on-page panel when the portal asks)</span></div>
+    <ul id="qaList" class="log"></ul>
+    <p class="muted small">Stored ONLY on this device (chrome.storage.local). Never sent anywhere.
+      Anyone with access to this browser profile could read them — use only on your own computer.</p>
+  </div>
+  <div class="row">
+    <label class="check"><input type="checkbox" id="abEnabled"> Auto-book matching slot (auto-select + submit)</label>
+  </div>
+  <p class="muted small">Auto-book clicks through the portal for you when a match is found.
+    It stops and tells you if a human-verification check appears. It cannot guarantee a slot.</p>
+</section>
+
+<section class="card">
+  <h2>Session health</h2>
+  <div class="row">
+    <button id="checkNow">Check now</button>
+    <button id="testSound" class="secondary">Test sound</button>
+  </div>
+  <p class="muted small">Last check: <span id="lastCheck">never</span> · Next check in <span id="nextCheck">—</span> · Last result: <span id="lastResult">—</span></p>
+  <ul id="healthLog" class="log"></ul>
+</section>
+
+<footer>
+  <button id="save" class="primary">Save settings</button>
+  <span id="savedMsg" class="muted hidden">Saved ✓</span>
+</footer>
+<div class="muted small" id="myIp">Browser IP: checking…</div>
+
+<script src="../lib/storage.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

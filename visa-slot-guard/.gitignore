@@ -1,0 +1,18 @@
+*.egg-info/
+dist/
+build/
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Visual Studio solution metadata (local, machine-specific)
+.vs/
+
+# Packed/signed extension artifacts and keys — never commit a signing key
+*.crx
+*.pem
+
+# Local env/secrets
+.env
+.env.*
