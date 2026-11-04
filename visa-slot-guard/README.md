@@ -18,11 +18,6 @@ Written from scratch. No code taken from any other slot-checker.
 - When time slots appear: always pick the time with the most availability (within your date range) and Submit immediately — no toggle, nothing to watch for; if the page has no Submit button, call its submit function / recreate the button
 - Sound + desktop alerts on a matching date
 - Auto-book (auto-select slot + submit), opt-in
-- Community data sync (opt-in, off by default): periodically pulls recent posts from Reddit/Telegram
-  sources you add, and if several independently mention the same hour range, turns that into an
-  automatic burst window (toolbar popup → "Community data"). This is unverified third-party text,
-  not a confirmed schedule — see "What it fixes — and what it honestly cannot" below for the bounds
-  this is kept inside
 
 Everything is free; there are no tiers or billing.
 
@@ -31,7 +26,7 @@ Everything is free; there are no tiers or billing.
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select this folder.
 2. Open `usvisascheduling.com` — the Visa Slot Guard panel appears bottom-right.
 3. Save your username/password in the panel, then click **Log in now** (or tick auto-login).
-4. Click the extension icon → set consulate, then check the date range (defaults to today through 21 months out — the selector won't let you pick outside that window) → Save.
+4. Click the extension icon → check the date range (defaults to today through 21 months out — the selector won't let you pick outside that window) → Save.
 
 ## How monitoring works
 
@@ -53,16 +48,12 @@ Everything is free; there are no tiers or billing.
 - **Session expiry is the portal's decision.** Re-login needs your credentials and sometimes your security answers; without stored credentials it needs *you*.
 - **Rate limits / waiting rooms are the portal defending itself.** Checking every 30 seconds will get you throttled — the extension backs off instead of fighting it.
 - **No tool can guarantee you a slot.** Released slots are first-come-first-served and can vanish in under two minutes while hundreds of people compete.
-- **Community data sync is unverified folklore, not a confirmed release schedule, and is kept on a short leash because of that.** A single post can't create a burst window — it takes several independent mentions of the same hour range (vote threshold) before one is created; at most 4 auto windows exist at once; they run at a fixed, modest, non-configurable speed, never the aggressive end of what a manual burst window can do. Manually-added windows are never touched by this. It's off by default, and fetches only the Reddit subreddits / Telegram channels you explicitly add — nothing is scraped without you naming the source.
 - **An "Access limitation / Prohibited conduct" block is the portal's anti-abuse enforcement, not a bug.** It means the portal believes it detected automated use and is deliberately refusing access. The extension does not try to recover from this: it **stops every automatic action** (post rotation, auto-book, auto sign-in), badges `X`, sends a sticky notification, and will **not** clear cookies, reload, or retry — that would just be working around the block. Monitoring stays off until you deliberately untick "Pause monitoring" in the popup. If you believe the block is wrong, review the Terms and conditions page on ustraveldocs.com and contact the portal's support — the extension does not, and will not, auto-evade this.
 
 ## Privacy
 
 - Everything (settings, credentials, health log) lives in `chrome.storage.local` **on your device**.
-- No analytics. The only remote calls this extension ever makes are to the visa portal itself, and —
-  only if you opt in and add at least one source — to the Reddit/Telegram sources you name for
-  community data sync. Nothing else is contacted, and nothing is sent anywhere beyond the request
-  needed to read that source's public posts.
+- No analytics. The only remote calls this extension ever makes are to the visa portal itself.
 - Quick Login credentials never leave the browser. Anyone with access to your browser profile could read them: only use it on your own computer.
 
 ## Architecture
@@ -76,15 +67,14 @@ src/lib/          pure, unit-tested logic (no chrome.* except storage/notify)
   burst.js        burst-window / interval logic for OFC rotation (minute-of-hour + optional hour-of-day)
   session.js      HEALTHY/DEGRADED/NEEDS_USER state machine
   notify.js       sound + desktop alerts
-  community.js    Reddit/Telegram text -> hour-of-day vote clustering (parsing only, no network)
 src/content/portal.js   thin DOM adapter, answers worker messages
 src/content/login.js    B2C login filler (verifies the click, loop-guarded)
 src/content/panel.js    on-page panel (saved login, Log in now, Check slots)
 src/content/access-block.js  detects Prohibited Conduct blocks -> stop everything
 src/content/session-reset.js detects PSE0501 (plain session expiry) -> reset and re-login
-src/background/service-worker.js  orchestration (alarms, tabs, badge, community data fetch)
-src/popup/        settings UI, health log, community data sources
-tests/            node:test, 69 tests, no dependencies
+src/background/service-worker.js  orchestration (alarms, tabs, badge)
+src/popup/        settings UI, health log
+tests/            node:test, 65 tests, no dependencies
 ```
 
 ## Roadmap

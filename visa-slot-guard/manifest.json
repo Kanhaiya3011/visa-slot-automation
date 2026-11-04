@@ -45,12 +45,10 @@
       "world": "MAIN"
     }
   ],
-  "description": "Resilient US visa appointment slot monitor for usvisascheduling.com. Honest about portal limits: it tells you WHY it stopped, and resumes by itself when it can.",
+  "description": "Monitors usvisascheduling.com for appointment slots. Tells you why it stopped and resumes by itself when it can.",
   "host_permissions": [
     "https://*.usvisascheduling.com/*",
     "https://atlasauth.b2clogin.com/*",
-    "https://www.reddit.com/*",
-    "https://t.me/*",
     "https://api.ipify.org/*"
   ],
   "icons": {

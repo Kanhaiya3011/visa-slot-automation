@@ -34,15 +34,6 @@
     // slots are known to be released each hour.
     ofcBurstWindows: [],
     ofcRunning: false,
-    // Community data sources (opt-in, off by default): [{ type: 'reddit'
-    // (subreddit name) | 'telegram' (public channel username), id, enabled }].
-    // Periodically fetched and parsed (VSG.community) into hour-of-day burst
-    // windows tagged source:'auto' in ofcBurstWindows, applied automatically.
-    // This is unverified third-party text — see communitySyncEnabled.
-    communitySources: [],
-    communitySyncEnabled: false,
-    communityLastSyncAt: 0,
-    communityLastSyncNote: '',
     autoResetSession: true, // PSE0501 after inactivity: clear cookies, sign in again
     resetKeepCloudflare: true, // ...but keep Cloudflare's cookies (avoids a new human check)
     healthLog: [], // [{t, kind, msg}] newest last, capped

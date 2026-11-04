@@ -45,23 +45,11 @@
 
   // Posts come from the portal's OFC Post dropdown (saved by the on-page
   // panel), not a hard-coded list.
-  function renderPosts(s) {
-    var sel = $('consulate');
-    var list = (s.ofcPostList || []).slice();
-    if (s.consulate && !list.some(function (p) { return p.value === s.consulate; })) {
-      list.push({ value: s.consulate, name: s.consulateName || s.consulate });
-    }
-    sel.innerHTML = '';
-    sel.appendChild(new Option('', ''));
-    list.forEach(function (p) { sel.appendChild(new Option(p.name, p.value)); });
-    sel.value = s.consulate || '';
-    $('postsNote').textContent = (s.ofcPostList || []).length
-      ? 'Posts read from the portal on ' + new Date(s.ofcPostListAt).toLocaleDateString() + '.'
-      : 'Open the portal\'s Schedule Appointment page once to load the posts.';
-  }
-
   async function renderRotate(s) {
     var list = s.ofcPostList || [];
+    $('postsNote').textContent = list.length
+      ? 'Posts read from the portal on ' + new Date(s.ofcPostListAt).toLocaleDateString() + '.'
+      : 'Open the portal\'s Schedule Appointment page once to load the posts.';
     $('rotateBox').classList.toggle('hidden', !list.length);
     var box = $('rotateList');
     box.innerHTML = '';
@@ -88,55 +76,9 @@
     });
   }
 
-  function renderCommunity(s) {
-    $('communitySyncEnabled').checked = !!s.communitySyncEnabled;
-    var list = $('communityList');
-    list.innerHTML = '';
-    var sources = s.communitySources || [];
-    if (!sources.length) {
-      var none = document.createElement('li');
-      none.className = 'muted';
-      none.textContent = 'No sources added yet.';
-      list.appendChild(none);
-    }
-    sources.forEach(function (src, idx) {
-      var li = document.createElement('li');
-      var lab = document.createElement('label');
-      lab.className = 'check';
-      lab.style.display = 'inline';
-      var c = document.createElement('input');
-      c.type = 'checkbox';
-      c.checked = src.enabled !== false;
-      c.addEventListener('change', async function () {
-        var next = sources.slice();
-        next[idx] = Object.assign({}, src, { enabled: c.checked });
-        await send({ type: 'VSG_SAVE', patch: { communitySources: next } });
-        load();
-      });
-      lab.appendChild(c);
-      lab.appendChild(document.createTextNode(' ' + src.type + ': ' + src.id + ' '));
-      li.appendChild(lab);
-      var remove = document.createElement('button');
-      remove.className = 'secondary';
-      remove.textContent = 'Remove';
-      remove.addEventListener('click', async function () {
-        await send({ type: 'VSG_SAVE', patch: { communitySources: sources.filter(function (_, i) { return i !== idx; }) } });
-        load();
-      });
-      li.appendChild(remove);
-      list.appendChild(li);
-    });
-    var autoWindows = (s.ofcBurstWindows || []).filter(function (w) { return w && w.source === 'auto'; });
-    var note = s.communityLastSyncNote || '';
-    $('communityStatus').textContent = 'Last sync: ' + fmtTime(s.communityLastSyncAt) +
-      (note ? ' — ' + note : '') +
-      (autoWindows.length ? ' (' + autoWindows.length + ' active auto window' + (autoWindows.length > 1 ? 's' : '') + ')' : '');
-  }
-
   function renderStatus(s) {
     $('stateBadge').textContent = s.sessionState;
     $('stateBadge').className = 'badge ' + s.sessionState;
-    renderPosts(s);
     renderRotate(s);
     // Selectable range: today through 21 months out — matches what the
     // portal realistically offers, and the default dates themselves.
@@ -162,7 +104,6 @@
     $('qlPass').value = s.quickLogin.password || '';
     current = s;
     renderQA(s.quickLogin.securityQA || []);
-    renderCommunity(s);
     $('abEnabled').checked = s.autoBook.enabled;
     $('lastCheck').textContent = fmtTime(s.lastCheckAt);
     $('lastResult').textContent = s.lastResult || '—';
@@ -202,8 +143,6 @@
     await send({
       type: 'VSG_SAVE',
       patch: {
-        consulate: $('consulate').value,
-        consulateName: $('consulate').value ? $('consulate').selectedOptions[0].textContent.trim() : '',
         dateFrom: $('dateFrom').value,
         dateTo: $('dateTo').value,
         intervalMin: Number($('intervalMin').value),
@@ -229,26 +168,6 @@
 
   $('checkNow').addEventListener('click', async function () { await send({ type: 'VSG_CHECK_NOW' }); load(); });
   $('testSound').addEventListener('click', function () { send({ type: 'VSG_TEST_SOUND' }); });
-
-  $('communitySyncEnabled').addEventListener('change', async function () {
-    await send({ type: 'VSG_SAVE', patch: { communitySyncEnabled: $('communitySyncEnabled').checked } });
-    load();
-  });
-  $('communityAdd').addEventListener('click', async function () {
-    var id = $('communityId').value.trim();
-    if (!id) return;
-    var sources = ((current && current.communitySources) || []).concat([{ type: $('communityType').value, id: id, enabled: true }]);
-    await send({ type: 'VSG_SAVE', patch: { communitySources: sources } });
-    $('communityId').value = '';
-    load();
-  });
-  $('communitySyncNow').addEventListener('click', async function () {
-    $('communitySyncNow').disabled = true;
-    $('communityStatus').textContent = 'Syncing…';
-    await send({ type: 'VSG_COMMUNITY_SYNC_NOW' });
-    await load();
-    $('communitySyncNow').disabled = false;
-  });
 
   // Live countdown to the next scheduled slot check.
   function tickNextCheck() {

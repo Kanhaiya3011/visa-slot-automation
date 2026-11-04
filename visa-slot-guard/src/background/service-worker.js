@@ -8,14 +8,18 @@ importScripts(
   '/src/lib/availability.js',
   '/src/lib/scheduler.js',
   '/src/lib/session.js',
-  '/src/lib/notify.js',
-  '/src/lib/community.js'
+  '/src/lib/notify.js'
 );
 
 var ALARM = 'vsg-check';
-var COMMUNITY_ALARM = 'vsg-community-sync';
 var PORTAL_RE = /^https:\/\/([^/]*\.usvisascheduling\.com|atlasauth\.b2clogin\.com)\//;
 var PORTAL_URLS = ['https://*.usvisascheduling.com/*', 'https://atlasauth.b2clogin.com/*'];
+
+function fetchWithTimeout(url, timeoutMs) {
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, timeoutMs || 15000);
+  return fetch(url, { signal: controller.signal, credentials: 'omit' }).finally(function () { clearTimeout(timer); });
+}
 
 function sendToTab(tabId, msg, timeoutMs) {
   return new Promise(function (resolve) {
@@ -264,10 +268,6 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
     runCheck(false).catch(function (e) {
       VSG.storage.logHealth('error', 'check crashed: ' + String((e && e.message) || e));
     });
-  } else if (alarm.name === COMMUNITY_ALARM) {
-    syncCommunitySources(false).catch(function (e) {
-      VSG.storage.logHealth('error', 'community sync crashed: ' + String((e && e.message) || e));
-    });
   }
 });
 
@@ -275,12 +275,11 @@ chrome.runtime.onInstalled.addListener(async function () {
   await VSG.storage.updateSettings({ sessionState: 'UNKNOWN' });
   await setBadge('UNKNOWN');
   var settings = await VSG.storage.getSettings();
-  await ensureCommunityAlarm();
   if (settings.paused) return ensureAlarm();
   await scheduleNext(settings.intervalMin, 0);
 });
 
-chrome.runtime.onStartup.addListener(function () { ensureAlarm(); ensureCommunityAlarm(); });
+chrome.runtime.onStartup.addListener(function () { ensureAlarm(); });
 
 // --- session reset (PSE0501 after inactivity) ------------------------------
 // Clear the portal's cookies (and the B2C sign-in's, or it would sign
@@ -347,115 +346,6 @@ async function resetSession(tabId, reason) {
   return { ok: true, removed: c.removed, kept: c.kept };
 }
 
-// --- community data sources (opt-in, off by default) -----------------------
-// Unverified third-party text (Reddit/Telegram), voted into hour-of-day
-// burst windows (VSG.community) and applied automatically to
-// ofcBurstWindows. The safety bounds below exist specifically BECAUSE this
-// is unverified: a lone post can't create a window (minVotes), at most a
-// few windows exist at once (maxWindows), and the interval those windows
-// run at is a fixed, modest, non-settable floor. Manually-added windows (no
-// source:'auto' tag) are never touched by this.
-var COMMUNITY_MIN_VOTES = 2;
-var COMMUNITY_MAX_WINDOWS = 4;
-var COMMUNITY_AUTO_SEC = 20;
-var COMMUNITY_FETCH_TIMEOUT_MS = 15000;
-var COMMUNITY_SYNC_PERIOD_MIN = 240; // 4 hours — courteous to reddit.com/t.me too
-
-function fetchWithTimeout(url, timeoutMs) {
-  var controller = new AbortController();
-  var timer = setTimeout(function () { controller.abort(); }, timeoutMs || COMMUNITY_FETCH_TIMEOUT_MS);
-  return fetch(url, { signal: controller.signal, credentials: 'omit' }).finally(function () { clearTimeout(timer); });
-}
-
-function decodeHtmlEntities(s) {
-  return String(s || '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&#39;/g, '\'').replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ');
-}
-
-// Accept whatever conventional form a person actually types — "r/name",
-// "/r/name", or just "name" — and reduce it to the bare name the URL
-// builders below add their own prefix to. Typing it the "natural" way
-// otherwise builds an invalid URL (e.g. reddit.com/r/r%2Fname/...) that
-// fails outright rather than 404ing on a merely-wrong name.
-function stripPrefix(id, prefixRe) {
-  return String(id || '').trim().replace(prefixRe, '');
-}
-
-// Reddit's public .json endpoints need no auth; newest posts, not a search —
-// broader coverage, and the vote threshold downstream is what filters noise.
-async function fetchRedditTexts(subreddit) {
-  var name = stripPrefix(subreddit, /^\/?r\//i);
-  var url = 'https://www.reddit.com/r/' + encodeURIComponent(name) + '/new.json?limit=50';
-  var resp = await fetchWithTimeout(url);
-  if (!resp.ok) throw new Error('reddit ' + resp.status);
-  var data = await resp.json();
-  var posts = (data && data.data && data.data.children) || [];
-  return posts.map(function (p) {
-    var d = p.data || {};
-    return (d.title || '') + ' ' + (d.selftext || '');
-  });
-}
-
-// t.me/s/<channel> is Telegram's public, unauthenticated preview page for a
-// public channel — server-rendered HTML, no bot token needed.
-async function fetchTelegramTexts(channel) {
-  var name = stripPrefix(channel, /^@/);
-  var url = 'https://t.me/s/' + encodeURIComponent(name);
-  var resp = await fetchWithTimeout(url);
-  if (!resp.ok) throw new Error('telegram ' + resp.status);
-  var html = await resp.text();
-  var out = [];
-  var re = /<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
-  var m;
-  while ((m = re.exec(html)) !== null) out.push(decodeHtmlEntities(m[1].replace(/<[^>]+>/g, ' ')));
-  return out;
-}
-
-async function syncCommunitySources(manual) {
-  var settings = await VSG.storage.getSettings();
-  if (!manual && !settings.communitySyncEnabled) return { ok: false, reason: 'disabled' };
-  var sources = (settings.communitySources || []).filter(function (s) { return s && s.enabled && s.id; });
-  if (!sources.length) {
-    await VSG.storage.updateSettings({ communityLastSyncAt: Date.now(), communityLastSyncNote: 'No sources configured.' });
-    return { ok: true, windows: 0 };
-  }
-
-  var texts = [];
-  var errors = [];
-  for (var i = 0; i < sources.length; i++) {
-    var src = sources[i];
-    try {
-      var got = src.type === 'telegram' ? await fetchTelegramTexts(src.id) : await fetchRedditTexts(src.id);
-      texts = texts.concat(got);
-    } catch (e) {
-      errors.push(src.type + ':' + src.id + ' (' + String((e && e.message) || e) + ')');
-    }
-  }
-
-  var runs = VSG.community.windowsFromTexts(texts, { minVotes: COMMUNITY_MIN_VOTES, maxWindows: COMMUNITY_MAX_WINDOWS });
-  var autoWindows = runs.map(function (r) {
-    return { from: 0, to: 59, hourFrom: r.hourFrom, hourTo: r.hourTo, sec: COMMUNITY_AUTO_SEC, source: 'auto', votes: r.votes };
-  });
-  // Replace only the auto-tagged windows from the last sync — anything the
-  // user added by hand (no source:'auto') is never touched by this.
-  var kept = (settings.ofcBurstWindows || []).filter(function (w) { return !w || w.source !== 'auto'; });
-  var merged = kept.concat(autoWindows);
-
-  var note = texts.length + ' snippet(s) from ' + sources.length + ' source(s)' +
-    (errors.length ? '; failed: ' + errors.join(', ') : '') +
-    ' → ' + autoWindows.length + ' auto window(s)' +
-    (autoWindows.length ? ': ' + autoWindows.map(function (w) { return w.hourFrom + '-' + w.hourTo + 'h (' + w.votes + ' votes)'; }).join(', ') : '.');
-  await VSG.storage.updateSettings({ ofcBurstWindows: merged, communityLastSyncAt: Date.now(), communityLastSyncNote: note });
-  await VSG.storage.logHealth(errors.length && !texts.length ? 'warn' : 'info', 'Community sync: ' + note);
-  return { ok: true, windows: autoWindows.length, note: note };
-}
-
-async function ensureCommunityAlarm() {
-  var existing = await chrome.alarms.get(COMMUNITY_ALARM);
-  if (!existing) await chrome.alarms.create(COMMUNITY_ALARM, { delayInMinutes: 2, periodInMinutes: COMMUNITY_SYNC_PERIOD_MIN });
-}
-
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   (async function () {
     var settings = await VSG.storage.getSettings();
@@ -475,12 +365,6 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       // Interval change or unpause: reschedule from now.
       if (patch.intervalMin != null && patch.intervalMin !== settings.intervalMin) await chrome.alarms.clear(ALARM);
       await ensureAlarm();
-      // Newly enabled: don't make the user wait up to 4h for the first sync.
-      if (patch.communitySyncEnabled === true && !settings.communitySyncEnabled) {
-        syncCommunitySources(true).catch(function (e) {
-          VSG.storage.logHealth('error', 'community sync crashed: ' + String((e && e.message) || e));
-        });
-      }
       sendResponse({ ok: true });
     } else if (msg.type === 'VSG_GET_IP') {
       // Informational only (shown next to "Monitor: ..." in the on-page
@@ -490,12 +374,6 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
         var ipResp = await fetchWithTimeout('https://api.ipify.org?format=json', 8000);
         var ipData = await ipResp.json();
         sendResponse({ ok: true, data: { ip: (ipData && ipData.ip) || '' } });
-      } catch (e) {
-        sendResponse({ ok: false, error: String((e && e.message) || e) });
-      }
-    } else if (msg.type === 'VSG_COMMUNITY_SYNC_NOW') {
-      try {
-        sendResponse({ ok: true, data: await syncCommunitySources(true) });
       } catch (e) {
         sendResponse({ ok: false, error: String((e && e.message) || e) });
       }

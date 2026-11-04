@@ -585,7 +585,7 @@
   // --- ofc-schedule page: select the OFC Post on an interval ---------------
   var OFC_MIN_SEC = 5;
   var OFC_MAX_SEC = 600;
-  var ofc = { running: false, remaining: 0, idx: 0, timer: null, last: '', lastStepAt: 0, level: 0, pausedFor: '', lastReloginAttemptAt: 0, jitter: 1 };
+  var ofc = { running: false, remaining: 0, timer: null, last: '', lastValue: '', lastStepAt: 0, level: 0, pausedFor: '', lastReloginAttemptAt: 0, jitter: 1 };
   var ofcRelogging = false;
   var OFC_RELOGIN_COOLDOWN_MS = 60 * 1000; // same spirit as login.js's own auto-login-guard: don't hammer the form
 
@@ -608,6 +608,11 @@
   // far faster than the configured interval and make "next in" look like it
   // keeps jumping back to the top instead of counting down.
   var OFC_LAST_STEP_KEY = 'ofcLastStepAt';
+  // Persisted for the same reason as OFC_LAST_STEP_KEY: this page can reload
+  // mid-rotation, and an in-memory-only "don't repeat the last pick" would
+  // forget it across that reload, letting the same post come up twice in a
+  // row right after one.
+  var OFC_LAST_VALUE_KEY = 'ofcLastValue';
 
   function currentPageState() {
     var bodyText = '';
@@ -705,7 +710,7 @@
       var row = document.createElement('div');
       row.className = 'brow';
       var label = document.createElement('span');
-      label.textContent = fmtBurstRange(w) + ' → every ' + fmtInterval(w.sec) + (w.source === 'auto' ? ' (auto, ' + (w.votes || 0) + ' votes — set up sources in the toolbar popup)' : '');
+      label.textContent = fmtBurstRange(w) + ' → every ' + fmtInterval(w.sec);
       row.appendChild(label);
       var remove = document.createElement('a');
       remove.textContent = 'remove';
@@ -822,12 +827,21 @@
   function ofcStep() {
     var posts = ofcChosen();
     if (!posts.length) { ofcStop('None of the ticked posts are on this page.'); return; }
-    var value = posts[ofc.idx % posts.length];
-    ofc.idx++;
+    // Random, not round-robin: ofc.idx lived only in memory, and this page
+    // reloads mid-rotation (see OFC_LAST_STEP_KEY above) — every reload reset
+    // idx to 0, so the top post got picked far more than its fair share.
+    // Excluding the last-picked value (when there's more than one to choose
+    // from) avoids reselecting the same post twice in a row.
+    var pool = posts.length > 1 ? posts.filter(function (v) { return v !== ofc.lastValue; }) : posts;
+    var value = pool[Math.floor(Math.random() * pool.length)];
     var opt = ofcOptions().filter(function (o) { return o.value === value; })[0];
     var name = opt ? opt.textContent.trim() : value;
     var ok = ofcSelect(value);
     ofc.last = name + ' at ' + new Date().toLocaleTimeString();
+    ofc.lastValue = value;
+    var lvKey = {};
+    lvKey[OFC_LAST_VALUE_KEY] = value;
+    chrome.storage.local.set(lvKey); // fire-and-forget; lets a reload mid-rotation still avoid repeating this pick
     if (!ok) VSG.storage.logHealth('warn', 'OFC Post: could not select ' + name + '.');
     ofcTries[value] = (ofcTries[value] || 0) + 1;
     chrome.storage.local.set({ ofcTries: ofcTries }); // fire-and-forget; last write wins
@@ -1021,7 +1035,6 @@
     await send({ type: 'VSG_SAVE', patch: patch });
     await refresh();
     say('Selecting the OFC Post every ' + fmtInterval(patch.ofcIntervalSec) + '.', 'ok');
-    ofc.idx = 0;
     ofc.pausedFor = '';
     ofc.lastReloginAttemptAt = 0;
     // A fresh Start begins a new try-count session (resuming after a page
@@ -1140,8 +1153,10 @@
       say('Resuming OFC Post auto-select every ' + fmtInterval(settings.ofcIntervalSec) + '.', 'ok');
       var lsKeyReq = {};
       lsKeyReq[OFC_LAST_STEP_KEY] = 0;
-      var lastStep = (await chrome.storage.local.get(lsKeyReq))[OFC_LAST_STEP_KEY];
-      ofcRun(lastStep || null);
+      lsKeyReq[OFC_LAST_VALUE_KEY] = '';
+      var g2 = await chrome.storage.local.get(lsKeyReq);
+      ofc.lastValue = g2[OFC_LAST_VALUE_KEY] || '';
+      ofcRun(g2[OFC_LAST_STEP_KEY] || null);
     }
   }
 

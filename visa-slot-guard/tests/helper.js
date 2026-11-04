@@ -17,7 +17,6 @@ function loadAll() {
     'src/lib/questions.js',
     'src/lib/burst.js',
     'src/lib/notify.js',
-    'src/lib/community.js',
     'src/lib/sightings.js',
   ].forEach(loadLib);
 }

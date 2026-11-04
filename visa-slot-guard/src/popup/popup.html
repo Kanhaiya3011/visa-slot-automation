@@ -13,9 +13,6 @@
 
 <section class="card">
   <h2>Monitor</h2>
-  <label>Consulate
-      <select id="consulate"><option value=""></option></select>
-  </label>
   <p id="postsNote" class="muted small"></p>
   <div id="rotateBox" class="hidden">
     <div class="small"><strong>Posts to rotate on the OFC page</strong>
@@ -49,27 +46,6 @@
   </div>
   <div class="row">
     <label class="check"><input type="checkbox" id="resetKeepCloudflare"> Keep Cloudflare cookies when clearing (avoids a new human check)</label>
-  </div>
-</section>
-
-<section class="card">
-  <h2>Community data (experimental)</h2>
-  <p class="muted small">Periodically fetches recent posts from the sources below and, if several
-    independently mention the same hour range, adds an automatic burst window for it. This is
-    unverified third-party text — see the extension's README for the safety bounds this is subject to
-    (vote threshold, window cap, fixed modest speed). Off by default.</p>
-  <div class="row">
-    <label class="check"><input type="checkbox" id="communitySyncEnabled"> Enable community data sync</label>
-  </div>
-  <ul id="communityList" class="log"></ul>
-  <div class="row addRow">
-    <select id="communityType"><option value="reddit">Reddit (subreddit name)</option><option value="telegram">Telegram (public channel username)</option></select>
-    <input type="text" id="communityId" placeholder="e.g. visaslots">
-    <button id="communityAdd" class="secondary">Add</button>
-  </div>
-  <div class="row">
-    <button id="communitySyncNow" class="secondary">Sync now</button>
-    <span class="muted small" id="communityStatus"></span>
   </div>
 </section>
 

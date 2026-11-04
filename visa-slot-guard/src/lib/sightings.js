@@ -1,11 +1,10 @@
 /* Structured-sighting analysis — PURE, no DOM, no chrome APIs, no network.
  *
- * community.js turns noisy FREE TEXT ("slots around 2am") into burst-window
- * votes. This file does the same job starting from STRUCTURED snapshots —
- * e.g. a periodically-captured table of { location, visaType, earliestDate }
- * like the ones aggregator sites (checkvisaslots.com and similar) publish —
- * instead of forum chatter. Nothing here fetches those sites; it only
- * analyzes snapshots handed to it, in whatever way they were captured.
+ * Turns STRUCTURED snapshots — e.g. a periodically-captured table of
+ * { location, visaType, earliestDate } like the ones aggregator sites
+ * (checkvisaslots.com and similar) publish — into hour-of-day burst-window
+ * votes. Nothing here fetches those sites; it only analyzes snapshots
+ * handed to it, in whatever way they were captured.
  *
  * The key insight: a raw "we checked and saw X" sighting proves nothing
  * about WHEN a slot opened — sightings happen every couple of minutes
@@ -14,11 +13,41 @@
  * earliest reported appointment date for a given (location, visaType)
  * moving EARLIER than it was last known to be. That only happens when a
  * new, better slot actually appears. Those change-moments — not every
- * sighting — are what gets bucketed by hour-of-day and voted on, reusing
- * VSG.community.clusterVotes so both pipelines agree on what a "window" is.
+ * sighting — are what gets bucketed by hour-of-day and voted on.
  */
 (function () {
   var VSG = (globalThis.VSG = globalThis.VSG || {});
+
+  // Contiguous hours (wrapping past midnight) that all meet minVotes become
+  // one window; windows are returned strongest (most total votes) first,
+  // capped at maxWindows so a long tail of weak signal can't pile up.
+  function clusterVotes(votes, minVotes, maxWindows) {
+    minVotes = minVotes == null ? 2 : minVotes;
+    maxWindows = maxWindows || 4;
+    var n = votes.length;
+    var visited = new Array(n).fill(false);
+    var runs = [];
+    for (var start = 0; start < n; start++) {
+      if (visited[start] || votes[start] < minVotes) continue;
+      var end = start;
+      var guard = 0;
+      while (!visited[(end + 1) % n] && votes[(end + 1) % n] >= minVotes && (end + 1) % n !== start && guard++ < n) {
+        end = (end + 1) % n;
+      }
+      var h = start;
+      var total = 0;
+      guard = 0;
+      for (;;) {
+        visited[h] = true;
+        total += votes[h];
+        if (h === end || ++guard > n) break;
+        h = (h + 1) % n;
+      }
+      runs.push({ hourFrom: start, hourTo: end, votes: total });
+    }
+    runs.sort(function (a, b) { return b.votes - a.votes; });
+    return runs.slice(0, maxWindows);
+  }
 
   function toDayNumber(dateStr) {
     var d = new Date(dateStr + 'T00:00:00Z');
@@ -84,11 +113,11 @@
       }
       votes[hourInTimeZone(seenAt, tz)] += weight;
     });
-    return VSG.community.clusterVotes(votes, opts.minVotes, opts.maxWindows);
+    return clusterVotes(votes, opts.minVotes, opts.maxWindows);
   }
 
   // Convenience: raw snapshots in, candidate {hourFrom, hourTo, votes}
-  // windows out — the structured-data analogue of community.windowsFromTexts.
+  // windows out.
   function windowsFromSnapshots(snapshots, opts) {
     return windowsFromEvents(detectReleaseEvents(snapshots), opts);
   }
